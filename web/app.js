@@ -13,6 +13,7 @@ const buttons = {
   b: 1 << 1,
   select: 1 << 2,
   start: 1 << 3,
+  enter: (1 << 0) | (1 << 3),
   right: 1 << 4,
   left: 1 << 5,
   up: 1 << 6,
@@ -22,7 +23,7 @@ const buttons = {
 };
 
 const keyMap = new Map([
-  ['KeyZ', 'a'], ['KeyX', 'b'], ['Backspace', 'select'], ['Enter', 'start'],
+  ['KeyZ', 'a'], ['KeyX', 'b'], ['Backspace', 'select'], ['Enter', 'enter'],
   ['ArrowRight', 'right'], ['ArrowLeft', 'left'], ['ArrowUp', 'up'], ['ArrowDown', 'down'],
   ['KeyS', 'r'], ['KeyA', 'l'],
 ]);
@@ -33,7 +34,7 @@ const ctx = canvas.getContext('2d');
 const image = ctx.createImageData(WIDTH, HEIGHT);
 const layerData = new Uint8Array(WIDTH * HEIGHT);
 const pressed = new Set();
-const pendingPresses = new Set();
+const pendingPresses = new Map();
 
 let instance;
 let memory;
@@ -482,14 +483,21 @@ function importsFor(module) {
 function writeKeys() {
   let held = 0;
   for (const key of pressed) held |= buttons[key] || 0;
-  for (const key of pendingPresses) held |= buttons[key] || 0;
+  for (const key of pendingPresses.keys()) held |= buttons[key] || 0;
   u16[KEYINPUT >> 1] = KEY_MASK ^ held;
+}
+
+function stepPendingPresses() {
+  for (const [key, frames] of pendingPresses) {
+    if (frames <= 1) pendingPresses.delete(key);
+    else pendingPresses.set(key, frames - 1);
+  }
 }
 
 function setPressed(name, isPressed) {
   if (isPressed) {
     pressed.add(name);
-    pendingPresses.add(name);
+    pendingPresses.set(name, 12);
   } else {
     pressed.delete(name);
   }
@@ -524,7 +532,7 @@ async function boot() {
   const module = await WebAssembly.compile(bytes);
   instance = await WebAssembly.instantiate(module, importsFor(module));
   memory = instance.exports.memory;
-  window.pokeemerald = { instance, memory };
+  window.pokeemerald = { instance, memory, runFrames };
   refreshViews();
   writeKeys();
   instance.exports.AgbMain();
@@ -532,13 +540,19 @@ async function boot() {
   setInterval(tick, 1000 / 60);
 }
 
+function runFrames(frameCount, keyMask = 0) {
+  for (let i = 0; i < frameCount; i++) {
+    if (keyMask) u16[KEYINPUT >> 1] = KEY_MASK ^ keyMask;
+    else writeKeys();
+    instance.exports.WasmRunFrame();
+    stepPendingPresses();
+  }
+  u16[KEYINPUT >> 1] = KEY_MASK;
+}
+
 function tick() {
   try {
-    writeKeys();
-    for (let i = 0; i < FRAMES_PER_TICK; i++) {
-      instance.exports.WasmRunFrame();
-    }
-    pendingPresses.clear();
+    runFrames(FRAMES_PER_TICK);
     render();
   } catch (error) {
     console.error(error);
