@@ -77,6 +77,32 @@ h1 {
   font-size: 13px;
 }
 
+.speed-control {
+  width: min(720px, calc(100vw - 64px));
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.speed-control label {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #d5c9a3;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#speed-value {
+  color: #79f7c8;
+  font-variant-numeric: tabular-nums;
+}
+
+#speed {
+  width: 100%;
+  accent-color: #79f7c8;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;

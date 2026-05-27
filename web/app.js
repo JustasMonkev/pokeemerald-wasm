@@ -7,9 +7,11 @@ const OAM = 0x07000000;
 const KEYINPUT = 0x04000130;
 const KEY_MASK = 0x03ff;
 const speedParam = new URLSearchParams(location.search).get('speed');
-const UNBOUNDED_SPEED = speedParam === '0';
-const FRAMES_PER_TICK = UNBOUNDED_SPEED ? 1 : Math.max(1, Number(speedParam) || 1);
-const UNBOUNDED_FRAME_BUDGET_MS = 16;
+const MIN_SPEED = 0.1;
+const MAX_SPEED = 10000;
+const MIN_SPEED_EXPONENT = Math.log10(MIN_SPEED);
+const MAX_SPEED_EXPONENT = Math.log10(MAX_SPEED);
+const FAST_FRAME_BUDGET_MS = 16;
 
 const buttons = {
   a: 1 << 0,
@@ -32,6 +34,8 @@ const keyMap = new Map([
 
 const canvas = document.querySelector('#screen');
 const statusEl = document.querySelector('#status');
+const speedInput = document.querySelector('#speed');
+const speedValue = document.querySelector('#speed-value');
 const ctx = canvas.getContext('2d');
 const image = ctx.createImageData(WIDTH, HEIGHT);
 const layerData = new Uint8Array(WIDTH * HEIGHT);
@@ -44,12 +48,52 @@ let u8;
 let u16;
 let statusText = 'loading wasm…';
 let lastFpsUpdate = performance.now();
+let lastTick = performance.now();
 let renderedFrames = 0;
 let emulatedFrames = 0;
+let gameFrameAccumulator = 0;
+let speed = 1;
 
 function refreshViews() {
   u8 = new Uint8Array(memory.buffer);
   u16 = new Uint16Array(memory.buffer);
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function speedToExponent(value) {
+  return Math.log10(clamp(value, MIN_SPEED, MAX_SPEED));
+}
+
+function exponentToSpeed(value) {
+  return 10 ** clamp(value, MIN_SPEED_EXPONENT, MAX_SPEED_EXPONENT);
+}
+
+function formatSpeed(value) {
+  if (value < 1) return `${value.toFixed(1)}x`;
+  if (value < 100) return `${value.toFixed(value < 10 ? 1 : 0)}x`;
+  return `${Math.round(value)}x`;
+}
+
+function setSpeedFromExponent(exponent) {
+  speed = exponentToSpeed(Number(exponent));
+  speedInput.value = String(speedToExponent(speed));
+  speedValue.textContent = formatSpeed(speed);
+}
+
+function resetFpsCounters() {
+  lastFpsUpdate = performance.now();
+  renderedFrames = 0;
+  emulatedFrames = 0;
+  gameFrameAccumulator = 0;
+}
+
+function initialSpeed() {
+  if (speedParam === '0') return MAX_SPEED;
+  const parsed = Number(speedParam);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function gbaColor(value) {
@@ -533,6 +577,11 @@ document.querySelectorAll('[data-key]').forEach((button) => {
   button.addEventListener('pointerleave', () => setPressed(name, false));
 });
 
+speedInput.addEventListener('input', () => {
+  setSpeedFromExponent(speedInput.value);
+  resetFpsCounters();
+});
+
 async function boot() {
   const bytes = await fetch('/build/wasm/pokeemerald.wasm', { cache: 'no-store' }).then((res) => res.arrayBuffer());
   const module = await WebAssembly.compile(bytes);
@@ -543,9 +592,9 @@ async function boot() {
   writeKeys();
   instance.exports.AgbMain();
   statusText = `running — ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MiB wasm`;
-  statusEl.textContent = `${statusText} — 0 fps`;
-  if (UNBOUNDED_SPEED) setTimeout(tick, 0);
-  else setInterval(tick, 1000 / 60);
+  setSpeedFromExponent(speedToExponent(initialSpeed()));
+  statusEl.textContent = `${statusText} — Display FPS: 0, Game FPS: 0`;
+  requestAnimationFrame(tick);
 }
 
 function updateFps(frameCount) {
@@ -558,8 +607,7 @@ function updateFps(frameCount) {
 
   const fps = Math.round(renderedFrames * 1000 / elapsed);
   const gameFps = Math.round(emulatedFrames * 1000 / elapsed);
-  const suffix = UNBOUNDED_SPEED || FRAMES_PER_TICK !== 1 ? `${fps} fps / ${gameFps} game fps` : `${fps} fps`;
-  statusEl.textContent = `${statusText} — ${suffix}`;
+  statusEl.textContent = `${statusText} — Display FPS: ${fps}, Game FPS: ${gameFps}`;
   lastFpsUpdate = now;
   renderedFrames = 0;
   emulatedFrames = 0;
@@ -575,23 +623,29 @@ function runFrames(frameCount, keyMask = 0) {
   u16[KEYINPUT >> 1] = KEY_MASK;
 }
 
-function runUnboundedFrames() {
+function runFramesForTick(elapsedMs) {
+  gameFrameAccumulator += speed * elapsedMs / (1000 / 60);
+  let frameCount = Math.floor(gameFrameAccumulator);
+  gameFrameAccumulator -= frameCount;
+  if (frameCount === 0) return 0;
+
   const start = performance.now();
   let frames = 0;
-  do {
+  while (frames < frameCount && performance.now() - start < FAST_FRAME_BUDGET_MS) {
     runFrames(1);
     frames++;
-  } while (performance.now() - start < UNBOUNDED_FRAME_BUDGET_MS);
+  }
   return frames;
 }
 
-function tick() {
+function tick(now) {
   try {
-    const frames = UNBOUNDED_SPEED ? runUnboundedFrames() : FRAMES_PER_TICK;
-    if (!UNBOUNDED_SPEED) runFrames(frames);
+    const elapsedMs = Math.min(now - lastTick, 100);
+    lastTick = now;
+    const frames = runFramesForTick(elapsedMs);
     render();
     updateFps(frames);
-    if (UNBOUNDED_SPEED) setTimeout(tick, 0);
+    requestAnimationFrame(tick);
   } catch (error) {
     console.error(error);
     statusEl.textContent = error.stack || String(error);
