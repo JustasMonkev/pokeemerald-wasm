@@ -32,6 +32,7 @@ const ctx = canvas.getContext('2d');
 const image = ctx.createImageData(WIDTH, HEIGHT);
 const layerData = new Uint8Array(WIDTH * HEIGHT);
 const pressed = new Set();
+const pendingPresses = new Set();
 
 let instance;
 let memory;
@@ -451,12 +452,17 @@ function importsFor(module) {
 function writeKeys() {
   let held = 0;
   for (const key of pressed) held |= buttons[key] || 0;
+  for (const key of pendingPresses) held |= buttons[key] || 0;
   u16[KEYINPUT >> 1] = KEY_MASK ^ held;
 }
 
 function setPressed(name, isPressed) {
-  if (isPressed) pressed.add(name);
-  else pressed.delete(name);
+  if (isPressed) {
+    pressed.add(name);
+    pendingPresses.add(name);
+  } else {
+    pressed.delete(name);
+  }
   document.querySelectorAll(`[data-key='${name}']`).forEach((el) => el.classList.toggle('pressed', isPressed));
   if (u16) writeKeys();
 }
@@ -500,6 +506,7 @@ function tick() {
   try {
     writeKeys();
     instance.exports.WasmRunFrame();
+    pendingPresses.clear();
     render();
   } catch (error) {
     console.error(error);
