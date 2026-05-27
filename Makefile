@@ -165,8 +165,8 @@ MAKEFLAGS += --no-print-directory
 # Delete files that weren't built properly
 .DELETE_ON_ERROR:
 
-RULES_NO_SCAN += libagbsyscall clean clean-assets tidy tidymodern tidynonmodern generated clean-generated wasm-assets wasm-text clean-wasm serve-wasm
-.PHONY: all rom modern compare wasm wasm-assets clean-wasm serve-wasm
+RULES_NO_SCAN += libagbsyscall clean clean-assets tidy tidymodern tidynonmodern generated clean-generated wasm-assets wasm-text wasm-maps clean-wasm serve-wasm
+.PHONY: all rom modern compare wasm wasm-assets wasm-text wasm-maps clean-wasm serve-wasm
 .PHONY: $(RULES_NO_SCAN)
 
 infoshell = $(foreach line, $(shell $1 | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
@@ -211,6 +211,7 @@ C_SRCS := $(foreach src,$(C_SRCS_IN),$(if $(findstring .inc.c,$(src)),,$(src)))
 C_OBJS := $(patsubst $(C_SUBDIR)/%.c,$(C_BUILDDIR)/%.o,$(C_SRCS))
 WASM_C_OBJS := $(patsubst $(C_SUBDIR)/%.c,$(WASM_OBJ_DIR)/%.o,$(C_SRCS))
 WASM_C_OBJS += $(WASM_OBJ_DIR)/generated_text.o
+WASM_C_OBJS += $(WASM_OBJ_DIR)/generated_maps.o
 
 C_ASM_SRCS := $(wildcard $(C_SUBDIR)/*.s $(C_SUBDIR)/*/*.s $(C_SUBDIR)/*/*/*.s)
 C_ASM_OBJS := $(patsubst $(C_SUBDIR)/%.s,$(C_BUILDDIR)/%.o,$(C_ASM_SRCS))
@@ -240,7 +241,7 @@ ifeq ($(COMPARE),1)
 	@$(SHA1) rom.sha1
 endif
 
-wasm: generated wasm-assets wasm-text $(WASM)
+wasm: generated wasm-assets wasm-text wasm-maps $(WASM)
 
 wasm-assets: $(GFX)
 	uv run python tools/generate_wasm_assets.py
@@ -248,7 +249,12 @@ wasm-assets: $(GFX)
 wasm-text:
 	uv run python tools/generate_wasm_text.py
 
-$(WASM_C_OBJS): | generated wasm-assets wasm-text
+wasm-maps: $(WASM_BUILD_DIR)/generated_maps.c
+
+$(WASM_BUILD_DIR)/generated_maps.c: tools/generate_wasm_maps.py data/layouts/InsideOfTruck/border.bin data/layouts/InsideOfTruck/map.bin
+	uv run python tools/generate_wasm_maps.py
+
+$(WASM_C_OBJS): | generated wasm-assets wasm-text wasm-maps
 
 $(WASM): $(WASM_C_OBJS)
 	@test -n "$(WASM_LD)" || { echo "wasm-ld not found; set WASM_LD=/path/to/wasm-ld"; exit 1; }
@@ -259,6 +265,10 @@ $(WASM_OBJ_DIR)/%.o: $(C_SUBDIR)/%.c
 	$(WASM_CC) --target=wasm32-unknown-unknown -DMODERN=1 -DWASM=1 -I include/wasm -I include -iquote include -E $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(WASM_CC) --target=wasm32-unknown-unknown -x c -O2 -Wno-incompatible-library-redeclaration -Wno-unknown-attributes -Wno-ignored-attributes -Wno-parentheses -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-builtin-requires-header -Wno-gnu-alignof-expression -Wno-unknown-escape-sequence -Wno-excess-initializers -c - -o $@
 
 $(WASM_OBJ_DIR)/generated_text.o: $(WASM_BUILD_DIR)/generated_text.c
+	@mkdir -p $(dir $@)
+	$(WASM_CC) --target=wasm32-unknown-unknown -DMODERN=1 -DWASM=1 -I include/wasm -I include -iquote include -E $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(WASM_CC) --target=wasm32-unknown-unknown -x c -O2 -Wno-incompatible-library-redeclaration -Wno-unknown-attributes -Wno-ignored-attributes -Wno-parentheses -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-builtin-requires-header -Wno-gnu-alignof-expression -Wno-unknown-escape-sequence -Wno-excess-initializers -c - -o $@
+
+$(WASM_OBJ_DIR)/generated_maps.o: $(WASM_BUILD_DIR)/generated_maps.c
 	@mkdir -p $(dir $@)
 	$(WASM_CC) --target=wasm32-unknown-unknown -DMODERN=1 -DWASM=1 -I include/wasm -I include -iquote include -E $< | $(PREPROC) -i -g $(ASSETS_DIR_NAME) $< charmap.txt | $(WASM_CC) --target=wasm32-unknown-unknown -x c -O2 -Wno-incompatible-library-redeclaration -Wno-unknown-attributes -Wno-ignored-attributes -Wno-parentheses -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-builtin-requires-header -Wno-gnu-alignof-expression -Wno-unknown-escape-sequence -Wno-excess-initializers -c - -o $@
 

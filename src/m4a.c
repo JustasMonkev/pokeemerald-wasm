@@ -50,8 +50,8 @@ void m4aSongNumStartOrChange(u16 n) { WasmMPlayStart(&gMPlayInfo_BGM); }
 void m4aSongNumStop(u16 n) { WasmMPlayStop(&gMPlayInfo_BGM); }
 void m4aMPlayAllStop(void) { WasmMPlayStop(&gMPlayInfo_BGM); }
 void m4aMPlayContinue(struct MusicPlayerInfo *mplayInfo) { WasmMPlayStart(mplayInfo); }
-void m4aMPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayStop(mplayInfo); }
-void m4aMPlayFadeOutTemporarily(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayStop(mplayInfo); }
+void m4aMPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed) {}
+void m4aMPlayFadeOutTemporarily(struct MusicPlayerInfo *mplayInfo, u16 speed) {}
 void m4aMPlayFadeIn(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayStart(mplayInfo); }
 void m4aMPlayImmInit(struct MusicPlayerInfo *mplayInfo) { WasmMPlayStart(mplayInfo); }
 void m4aMPlayStop(struct MusicPlayerInfo *mplayInfo) { WasmMPlayStop(mplayInfo); }
@@ -62,7 +62,7 @@ void m4aMPlayPanpotControl(struct MusicPlayerInfo *mplayInfo, u16 trackBits, s8 
 void m4aMPlayModDepthSet(struct MusicPlayerInfo *mplayInfo, u16 trackBits, u8 modDepth) {}
 void m4aMPlayLFOSpeedSet(struct MusicPlayerInfo *mplayInfo, u16 trackBits, u8 lfoSpeed) {}
 void MPlayContinue(struct MusicPlayerInfo *mplayInfo) { WasmMPlayStart(mplayInfo); }
-void MPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed) { WasmMPlayStop(mplayInfo); }
+void MPlayFadeOut(struct MusicPlayerInfo *mplayInfo, u16 speed) {}
 void MPlayStart(struct MusicPlayerInfo *mplayInfo, struct SongHeader *songHeader) { WasmMPlayStart(mplayInfo); }
 void MPlayMain(struct MusicPlayerInfo *mplayInfo) {}
 void MPlayOpen(struct MusicPlayerInfo *mplayInfo, struct MusicPlayerTrack *tracks, u8 trackCount) { WasmMPlayStart(mplayInfo); }
