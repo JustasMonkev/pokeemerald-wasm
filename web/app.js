@@ -51,11 +51,37 @@ function gbaColor(value) {
   return [r | 0, g | 0, b | 0];
 }
 
-function activeBlendColor(color, layer, pixel) {
+function inWindowRange(value, range) {
+  const start = range >> 8;
+  const end = range & 0xff;
+  return start <= end ? value >= start && value < end : value >= start || value < end;
+}
+
+function windowMask(x, y) {
+  const dispcnt = u16[REG >> 1];
+  const windowsEnabled = dispcnt & 0xe000;
+  if (!windowsEnabled) return 0x3f;
+
+  if ((dispcnt & 0x2000)
+      && inWindowRange(x, u16[(REG + 0x40) >> 1])
+      && inWindowRange(y, u16[(REG + 0x44) >> 1])) {
+    return u16[(REG + 0x48) >> 1] & 0x3f;
+  }
+
+  if ((dispcnt & 0x4000)
+      && inWindowRange(x, u16[(REG + 0x42) >> 1])
+      && inWindowRange(y, u16[(REG + 0x46) >> 1])) {
+    return (u16[(REG + 0x48) >> 1] >> 8) & 0x3f;
+  }
+
+  return u16[(REG + 0x4a) >> 1] & 0x3f;
+}
+
+function activeBlendColor(color, layer, pixel, effectsEnabled) {
   const bldcnt = u16[(REG + 0x50) >> 1];
   const effect = (bldcnt >> 6) & 3;
   const sourceTargets = bldcnt & 0x3f;
-  if (!(sourceTargets & layer) || effect === 0) return color;
+  if (!effectsEnabled || !(sourceTargets & layer) || effect === 0) return color;
 
   if (effect === 1 && (bldcnt >> 8) & layerData[pixel]) {
     const alpha = u16[(REG + 0x52) >> 1];
@@ -80,8 +106,11 @@ function activeBlendColor(color, layer, pixel) {
 
 function putPixel(x, y, color, layer = 0x20) {
   if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
+  const mask = windowMask(x, y);
+  if (!(mask & layer)) return;
+
   const pixel = y * WIDTH + x;
-  const output = activeBlendColor(color, layer, pixel);
+  const output = activeBlendColor(color, layer, pixel, mask & 0x20);
   const p = pixel * 4;
   image.data[p] = output[0];
   image.data[p + 1] = output[1];
