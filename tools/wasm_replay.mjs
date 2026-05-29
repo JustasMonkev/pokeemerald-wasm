@@ -181,7 +181,12 @@ async function newPage(browserWs) {
 
 async function evaluate(cdp, expression, awaitPromise = true) {
   const result = await cdp.send('Runtime.evaluate', { expression, awaitPromise, returnByValue: true });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+  if (result.exceptionDetails) {
+    const details = result.exceptionDetails;
+    const exception = details.exception?.description || details.exception?.value;
+    const location = `${details.url || '<anonymous>'}:${details.lineNumber ?? 0}:${details.columnNumber ?? 0}`;
+    throw new Error([details.text, exception, location].filter(Boolean).join('\n'));
+  }
   return result.result.value;
 }
 

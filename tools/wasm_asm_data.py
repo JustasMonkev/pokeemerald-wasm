@@ -625,7 +625,7 @@ def expand_macro(stripped: str, constants: Dict[str, int], counters: Dict[str, i
 
     macro_name = stripped.split(" ", 1)[0]
     # Native macro definitions own command names that collide across script engines.
-    if macro_name in macros and (stripped == macro_name or macro_name in {"end", "return", "call", "goto"}):
+    if macro_name in macros and (stripped == macro_name or macro_name in {"end", "return", "call", "goto", "delay", "playse"}):
         expanded = expand_loaded_macro()
         if expanded is not None:
             return expanded
