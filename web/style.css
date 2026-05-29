@@ -213,6 +213,9 @@ button.pressed {
 
 .keys {
   margin: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   color: #e8dcb9;
   font-size: clamp(11px, 1.8vmin, 15px);
   line-height: 1.2;
