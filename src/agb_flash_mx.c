@@ -53,6 +53,12 @@ const struct FlashSetupInfo DefaultFlash =
 
 u16 EraseFlashChip_MX(void)
 {
+#if WASM
+    u32 i;
+    for (i = 0; i < gFlash->romSize; i++)
+        FLASH_BASE[i] = 0xFF;
+    return 0;
+#else
     u16 result;
     u16 readFlash1Buffer[0x20];
 
@@ -72,10 +78,23 @@ u16 EraseFlashChip_MX(void)
     REG_WAITCNT = (REG_WAITCNT & ~WAITCNT_SRAM_MASK) | WAITCNT_SRAM_8;
 
     return result;
+#endif
 }
 
 u16 EraseFlashSector_MX(u16 sectorNum)
 {
+#if WASM
+    u32 i;
+    u8 *addr;
+
+    if (sectorNum >= gFlash->sector.count)
+        return 0x80FF;
+
+    addr = FLASH_BASE + (sectorNum << gFlash->sector.shift);
+    for (i = 0; i < gFlash->sector.size; i++)
+        addr[i] = 0xFF;
+    return 0;
+#else
     u16 numTries;
     u16 result;
     u8 *addr;
@@ -116,10 +135,20 @@ done:
     REG_WAITCNT = (REG_WAITCNT & ~WAITCNT_SRAM_MASK) | WAITCNT_SRAM_8;
 
     return result;
+#endif
 }
 
 u16 ProgramFlashByte_MX(u16 sectorNum, u32 offset, u8 data)
 {
+#if WASM
+    if (sectorNum >= gFlash->sector.count)
+        return 0x80FF;
+    if (offset >= gFlash->sector.size)
+        return 0x8000;
+
+    FLASH_BASE[(sectorNum << gFlash->sector.shift) + offset] = data;
+    return 0;
+#else
     u8 *addr;
     u16 readFlash1Buffer[0x20];
 
@@ -141,6 +170,7 @@ u16 ProgramFlashByte_MX(u16 sectorNum, u32 offset, u8 data)
     *addr = data;
 
     return WaitForFlashWrite(1, addr, data);
+#endif
 }
 
 static u16 ProgramByte(u8 *src, u8 *dest)
@@ -155,6 +185,18 @@ static u16 ProgramByte(u8 *src, u8 *dest)
 
 u16 ProgramFlashSector_MX(u16 sectorNum, u8 *src)
 {
+#if WASM
+    u32 i;
+    u8 *dest;
+
+    if (sectorNum >= gFlash->sector.count)
+        return 0x80FF;
+
+    dest = FLASH_BASE + (sectorNum << gFlash->sector.shift);
+    for (i = 0; i < gFlash->sector.size; i++)
+        dest[i] = src[i];
+    return 0;
+#else
     u16 result;
     u8 *dest;
     u16 readFlash1Buffer[0x20];
@@ -190,4 +232,5 @@ u16 ProgramFlashSector_MX(u16 sectorNum, u8 *src)
     }
 
     return result;
+#endif
 }

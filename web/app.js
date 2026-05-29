@@ -6,6 +6,10 @@ const VRAM = 0x06000000;
 const OAM = 0x07000000;
 const KEYINPUT = 0x04000130;
 const KEY_MASK = 0x03ff;
+const FLASH_BASE = 0x0e000000;
+const FLASH_SIZE = 128 * 1024;
+const SAVE_STORAGE_KEY = 'pokeemerald.wasm.flash.v1';
+const SAVE_FLUSH_INTERVAL_FRAMES = 60;
 const searchParams = new URLSearchParams(location.search);
 const speedParam = searchParams.get('speed');
 const automate = searchParams.get('automate') === '1';
@@ -56,6 +60,8 @@ let emulatedFrames = 0;
 let gameFrameAccumulator = 0;
 let speed = 1;
 let currentFrame = 0;
+let lastSavedFlashHash = 0;
+let lastSaveFlushFrame = 0;
 let automationReady;
 let resolveAutomationReady;
 if (automate) {
@@ -65,6 +71,69 @@ if (automate) {
 function refreshViews() {
   u8 = new Uint8Array(memory.buffer);
   u16 = new Uint16Array(memory.buffer);
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    const chunk = bytes.subarray(i, i + 0x8000);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function flashBytes() {
+  return u8.subarray(FLASH_BASE, FLASH_BASE + FLASH_SIZE);
+}
+
+function hashBytes(bytes) {
+  let hash = 2166136261;
+  for (const byte of bytes) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function loadFlashSave() {
+  const flash = flashBytes();
+  flash.fill(0xFF);
+
+  try {
+    const stored = localStorage.getItem(SAVE_STORAGE_KEY);
+    if (stored) {
+      const saved = base64ToBytes(stored);
+      if (saved.length === FLASH_SIZE) flash.set(saved);
+    }
+  } catch {
+    // Storage may be disabled; the game can still run with volatile flash.
+  }
+
+  lastSavedFlashHash = hashBytes(flash);
+}
+
+function saveFlashIfChanged(force = false) {
+  if (!u8) return;
+  if (!force && currentFrame - lastSaveFlushFrame < SAVE_FLUSH_INTERVAL_FRAMES) return;
+  lastSaveFlushFrame = currentFrame;
+
+  const flash = flashBytes();
+  const hash = hashBytes(flash);
+  if (!force && hash === lastSavedFlashHash) return;
+
+  try {
+    localStorage.setItem(SAVE_STORAGE_KEY, bytesToBase64(flash));
+    lastSavedFlashHash = hash;
+  } catch {
+    // Keep running even if the browser refuses persistent storage.
+  }
 }
 
 function clamp(value, min, max) {
@@ -614,6 +683,8 @@ window.addEventListener('keyup', (event) => {
   setPressed(name, false);
 });
 
+window.addEventListener('pagehide', () => saveFlashIfChanged(true));
+
 document.querySelectorAll('[data-key]').forEach((button) => {
   const name = button.dataset.key;
   button.addEventListener('pointerdown', (event) => { event.preventDefault(); setPressed(name, true); });
@@ -635,6 +706,7 @@ async function boot() {
   window.pokeemerald = { instance, memory, runFrames };
   if (automate) window.pokeemerald.automation = automationApi();
   refreshViews();
+  loadFlashSave();
   writeKeys();
   instance.exports.AgbMain();
   statusText = `running — ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MiB wasm`;
@@ -671,6 +743,7 @@ function runFrames(frameCount, keyMask = 0) {
     instance.exports.WasmRunFrame();
     currentFrame++;
     stepPendingPresses();
+    saveFlashIfChanged();
   }
   u16[KEYINPUT >> 1] = KEY_MASK;
 }

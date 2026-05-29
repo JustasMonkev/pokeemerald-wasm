@@ -12,6 +12,16 @@ static const struct FlashSetupInfo *const sSetupInfos[] =
 
 u16 IdentifyFlash(void)
 {
+#if WASM
+    ProgramFlashByte = DefaultFlash.programFlashByte;
+    ProgramFlashSector = DefaultFlash.programFlashSector;
+    EraseFlashChip = DefaultFlash.eraseFlashChip;
+    EraseFlashSector = DefaultFlash.eraseFlashSector;
+    WaitForFlashWrite = DefaultFlash.WaitForFlashWrite;
+    gFlashMaxTime = DefaultFlash.maxTime;
+    gFlash = &DefaultFlash.type;
+    return 0;
+#else
     u16 result;
     u16 flashId;
     const struct FlashSetupInfo *const *setupInfo;
@@ -46,6 +56,7 @@ u16 IdentifyFlash(void)
     gFlash = &(*setupInfo)->type;
 
     return result;
+#endif
 }
 
 u16 WaitForFlashWrite_Common(u8 phase, u8 *addr, u8 lastData)
