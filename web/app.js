@@ -15,6 +15,7 @@ const speedParam = searchParams.get('speed');
 const automate = searchParams.get('automate') === '1';
 const MIN_SPEED = 0.1;
 const MAX_SPEED = 1000;
+const UNLIMITED_SPEED_EXPONENT = Math.log10(MAX_SPEED) + 1;
 const MIN_SPEED_EXPONENT = Math.log10(MIN_SPEED);
 const MAX_SPEED_EXPONENT = Math.log10(MAX_SPEED);
 const FAST_FRAME_BUDGET_MS = 16;
@@ -142,14 +143,17 @@ function clamp(value, min, max) {
 }
 
 function speedToExponent(value) {
+  if (value === Infinity) return UNLIMITED_SPEED_EXPONENT;
   return Math.log10(clamp(value, MIN_SPEED, MAX_SPEED));
 }
 
 function exponentToSpeed(value) {
+  if (value >= UNLIMITED_SPEED_EXPONENT) return Infinity;
   return 10 ** clamp(value, MIN_SPEED_EXPONENT, MAX_SPEED_EXPONENT);
 }
 
 function formatSpeed(value) {
+  if (value === Infinity) return 'unlimited';
   if (value < 1) return `${value.toFixed(1)}x`;
   if (value < 100) return `${value.toFixed(value < 10 ? 1 : 0)}x`;
   return `${Math.round(value)}x`;
@@ -169,14 +173,14 @@ function resetFpsCounters() {
 }
 
 function initialSpeed() {
-  if (speedParam === '0') return MAX_SPEED;
+  if (speedParam === '0') return Infinity;
   const parsed = Number(speedParam);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function configureSpeedInput() {
   speedInput.min = String(MIN_SPEED_EXPONENT);
-  speedInput.max = String(MAX_SPEED_EXPONENT);
+  speedInput.max = String(UNLIMITED_SPEED_EXPONENT);
 }
 
 function gbaColor(value) {
@@ -822,14 +826,22 @@ function automationApi() {
 }
 
 function runFramesForTick(elapsedMs) {
-  gameFrameAccumulator += speed * elapsedMs / (1000 / 60);
-  let frameCount = Math.floor(gameFrameAccumulator);
-  gameFrameAccumulator -= frameCount;
-  if (frameCount === 0) return 0;
-
   const start = performance.now();
+  const frameBudgetMs = speed === Infinity ? elapsedMs : FAST_FRAME_BUDGET_MS;
+  let frameCount;
+
+  if (speed === Infinity) {
+    gameFrameAccumulator = 0;
+    frameCount = Infinity;
+  } else {
+    gameFrameAccumulator += speed * elapsedMs / (1000 / 60);
+    frameCount = Math.floor(gameFrameAccumulator);
+    gameFrameAccumulator -= frameCount;
+    if (frameCount === 0) return 0;
+  }
+
   let frames = 0;
-  while (frames < frameCount && performance.now() - start < FAST_FRAME_BUDGET_MS) {
+  while (frames < frameCount && performance.now() - start < frameBudgetMs) {
     const batchSize = Math.min(frameCount - frames, 256);
     runFrames(batchSize);
     frames += batchSize;
