@@ -64,11 +64,12 @@ Chrome/Chromium instance without the animation-frame cap and save deterministic
 canvas screenshots, browser console output, and errors.
 
 ```sh
-node tools/wasm_replay.mjs path/to/events.txt path/to/output-dir
+node tools/wasm_replay.mjs path/to/events.txt
 ```
 
 The tool runs `make wasm`, starts `web/server.mjs`, opens `/?automate=1`, applies
-input events at exact emulated frame numbers, and writes:
+input events at exact emulated frame numbers, recreates the fixed
+`wasm-replay-output/` folder, and writes:
 
 - `screenshots/*.png` for requested screenshot frames
 - `console.log` for server, browser, and page console messages

@@ -47,3 +47,4 @@ prefabs.json
 !web/*.js
 /pokeemerald-*.png
 /pokeemerald_modern-*.png
+/wasm-replay-output/

@@ -7,8 +7,10 @@ import { spawn } from 'node:child_process';
 
 const buttons = new Set(['a', 'b', 'select', 'start', 'right', 'left', 'up', 'down', 'r', 'l']);
 
+const defaultOutputDir = 'wasm-replay-output';
+
 function usage() {
-  console.error('usage: node tools/wasm_replay.mjs <events.txt> <output-dir> [--no-build] [--keep-browser]');
+  console.error('usage: node tools/wasm_replay.mjs <events.txt> [output-dir] [--no-build] [--keep-browser]');
   process.exit(2);
 }
 
@@ -20,8 +22,8 @@ function parseArgs(argv) {
     else if (arg === '--keep-browser') options.keepBrowser = true;
     else paths.push(arg);
   }
-  if (paths.length !== 2) usage();
-  return { inputPath: resolve(paths[0]), outputDir: resolve(paths[1]), options };
+  if (paths.length < 1 || paths.length > 2) usage();
+  return { inputPath: resolve(paths[0]), outputDir: resolve(paths[1] || defaultOutputDir), options };
 }
 
 function parseEvents(text) {
@@ -196,6 +198,7 @@ async function saveScreenshot(cdp, outputDir, event) {
 
 async function main() {
   const { inputPath, outputDir, options } = parseArgs(process.argv.slice(2));
+  await rm(outputDir, { recursive: true, force: true });
   await mkdir(resolve(outputDir, 'screenshots'), { recursive: true });
   const logLines = [];
   const errors = [];
