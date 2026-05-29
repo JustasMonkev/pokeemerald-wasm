@@ -1,11 +1,5 @@
-# Pokémon Emerald
+# pokeemerald-wasm
 
-This is a decompilation of Pokémon Emerald.
+pokeemerald-wasm is a recompilation of the original [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation to WebAssembly, with a browser frontend for running Pokémon Emerald on the web.
 
-It builds the following ROM:
-
-* [**pokeemerald.gba**](https://datomatic.no-intro.org/index.php?page=show_record&s=23&n=1961) `sha1: f3ae088181bf583e55daf962a92bb46f4f1d07b7`
-
-To set up the repository, see [INSTALL.md](INSTALL.md).
-
-For contacts and other pret projects, see [pret.github.io](https://pret.github.io/).
+The original pokeemerald README has been preserved at [docs/original-pokeemerald-readme.md](docs/original-pokeemerald-readme.md).
