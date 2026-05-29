@@ -14,7 +14,7 @@ const searchParams = new URLSearchParams(location.search);
 const speedParam = searchParams.get('speed');
 const automate = searchParams.get('automate') === '1';
 const MIN_SPEED = 0.1;
-const MAX_SPEED = 10000;
+const MAX_SPEED = 1000;
 const MIN_SPEED_EXPONENT = Math.log10(MIN_SPEED);
 const MAX_SPEED_EXPONENT = Math.log10(MAX_SPEED);
 const FAST_FRAME_BUDGET_MS = 16;
