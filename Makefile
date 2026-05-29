@@ -166,7 +166,7 @@ MAKEFLAGS += --no-print-directory
 .DELETE_ON_ERROR:
 
 RULES_NO_SCAN += libagbsyscall clean clean-assets tidy tidymodern tidynonmodern generated clean-generated wasm-assets wasm-text clean-wasm serve-wasm
-.PHONY: all rom modern compare wasm wasm-assets clean-wasm serve-wasm
+.PHONY: all rom modern compare wasm wasm-assets clean-wasm serve-wasm wrangler-site
 .PHONY: $(RULES_NO_SCAN)
 
 infoshell = $(foreach line, $(shell $1 | sed "s/ /__SPACE__/g"), $(info $(subst __SPACE__, ,$(line))))
@@ -273,6 +273,9 @@ clean-wasm:
 
 serve-wasm: $(WASM)
 	node web/server.mjs
+
+wrangler-site: wasm
+	node tools/build_wrangler_site.mjs
 
 syms: $(SYM)
 

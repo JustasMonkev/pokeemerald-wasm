@@ -1,0 +1,17 @@
+name = "pokeemerald-wasm"
+compatibility_date = "2026-05-29"
+workers_dev = false
+preview_urls = false
+
+[build]
+command = "make wrangler-site"
+watch_dir = ["web", "src", "include", "data", "graphics", "sound", "tools", "Makefile"]
+
+[assets]
+directory = "./dist/cloudflare"
+html_handling = "none"
+not_found_handling = "none"
+
+[[routes]]
+pattern = "pokeemerald.com"
+custom_domain = true
