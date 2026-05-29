@@ -9,7 +9,7 @@ const KEY_MASK = 0x03ff;
 const FLASH_BASE = 0x0e000000;
 const FLASH_SIZE = 128 * 1024;
 const SAVE_STORAGE_KEY = 'pokeemerald.wasm.flash.v1';
-const SAVE_FLUSH_INTERVAL_FRAMES = 60;
+const SAVE_FLUSH_INTERVAL_FRAMES = 1;
 const searchParams = new URLSearchParams(location.search);
 const speedParam = searchParams.get('speed');
 const automate = searchParams.get('automate') === '1';
@@ -683,7 +683,11 @@ window.addEventListener('keyup', (event) => {
   setPressed(name, false);
 });
 
+window.addEventListener('beforeunload', () => saveFlashIfChanged(true));
 window.addEventListener('pagehide', () => saveFlashIfChanged(true));
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveFlashIfChanged(true);
+});
 
 document.querySelectorAll('[data-key]').forEach((button) => {
   const name = button.dataset.key;
