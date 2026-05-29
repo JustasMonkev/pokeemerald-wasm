@@ -392,7 +392,7 @@ def load_event_macros(source: Optional[Path] = None) -> Dict[str, AsmMacro]:
 
 def substitute_constants(line: str, constants: Dict[str, int]) -> str:
     return re.sub(
-        r"\b[A-Z][A-Z0-9_]*\b",
+        r"\b[A-Z][A-Za-z0-9_]*\b",
         lambda match: str(constants.get(match.group(0), match.group(0))),
         line,
     )
@@ -413,6 +413,16 @@ def format_asm_expr(expr: str, constants: Dict[str, int]) -> str:
     if value is not None:
         return str(value)
     return substitute_constants(expr, constants)
+
+
+def normalize_data_directive(line: str, constants: Dict[str, int]) -> str:
+    if line.startswith((".byte ", ".2byte ", ".4byte ")):
+        directive, operands_text = line.split(" ", 1)
+        operands = split_args(operands_text)
+        return f"{directive} " + ", ".join(format_asm_expr(operand, constants) for operand in operands)
+    if line.startswith(".space "):
+        return substitute_constants(line, constants)
+    return line
 
 
 def eval_macro_condition(expr: str, constants: Dict[str, int]) -> bool:
@@ -1198,7 +1208,7 @@ def convert(text: str, source: Optional[Path] = None, emit_sizes: bool = True) -
 
         macro = expand_macro(stripped, constants, counters, macros)
         if macro is not None:
-            out.extend(macro)
+            out.extend(normalize_data_directive(line, constants) for line in macro)
             continue
 
         if stripped.startswith(".section"):
