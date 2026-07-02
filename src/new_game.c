@@ -51,6 +51,7 @@ extern const u8 EventScript_ResetAllMapFlags[];
 static void ClearFrontierRecord(void);
 static void WarpToTruck(void);
 static void ResetMiniGamesRecords(void);
+static void GiveNewGameSpawnBonuses(void);
 
 EWRAM_DATA bool8 gDifferentSaveFile = FALSE;
 EWRAM_DATA bool8 gEnableContestDebugging = FALSE;
@@ -184,6 +185,7 @@ void NewGameInitData(void)
     ClearRoamerLocationData();
     gSaveBlock1Ptr->registeredItem = ITEM_NONE;
     ClearBag();
+    GiveNewGameSpawnBonuses();
     NewGameInitPCItems();
     ClearPokeblocks();
     ClearDecorationInventories();
@@ -204,6 +206,17 @@ void NewGameInitData(void)
     WipeTrainerNameRecords();
     ResetTrainerHillResults();
     ResetContestLinkResults();
+}
+
+static void GiveNewGameSpawnBonuses(void)
+{
+    SetMoney(&gSaveBlock1Ptr->money, 999999);
+    AddBagItem(ITEM_RARE_CANDY, MAX_BAG_ITEM_CAPACITY);
+    AddBagItem(ITEM_MASTER_BALL, MAX_BAG_ITEM_CAPACITY);
+
+    CreateMon(&gPlayerParty[0], SPECIES_DRAGONITE, 100, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
+    CreateMon(&gPlayerParty[1], SPECIES_ZAPDOS, 100, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
+    gPlayerPartyCount = 2;
 }
 
 static void ResetMiniGamesRecords(void)
