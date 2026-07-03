@@ -86,6 +86,7 @@ const keyMap = new Map([
 ]);
 
 const canvas = document.querySelector('#screen');
+const displayPanel = document.querySelector('.display-panel');
 const statusEl = document.querySelector('#status');
 const speedButtons = document.querySelectorAll('[data-speed]');
 const speedValue = document.querySelector('#speed-value');
@@ -137,6 +138,22 @@ let resolveAutomationReady;
 if (automate) {
   automationReady = new Promise((resolve) => { resolveAutomationReady = resolve; });
 }
+
+function fitPixelCanvas() {
+  const style = getComputedStyle(displayPanel);
+  const width = displayPanel.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const height = displayPanel.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const dpr = window.devicePixelRatio || 1;
+  const scale = Math.max(1, Math.floor(Math.min(width * dpr / WIDTH, height * dpr / HEIGHT)));
+
+  canvas.style.width = `${WIDTH * scale / dpr}px`;
+  canvas.style.height = `${HEIGHT * scale / dpr}px`;
+}
+
+if (window.ResizeObserver) new ResizeObserver(fitPixelCanvas).observe(displayPanel);
+window.addEventListener('resize', fitPixelCanvas);
+document.addEventListener('fullscreenchange', fitPixelCanvas);
+fitPixelCanvas();
 
 function refreshViews() {
   u8 = new Uint8Array(memory.buffer);
@@ -1290,8 +1307,12 @@ function automationState() {
   const playerAvatar = instance.exports.gPlayerAvatar.value;
   const objectEventId = u8[playerAvatar + 5];
   const objectEvent = instance.exports.gObjectEvents.value + objectEventId * 0x24;
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
   return {
     frame: currentFrame,
+    screenScaleX: rect.width * dpr / WIDTH,
+    screenScaleY: rect.height * dpr / HEIGHT,
     x: readS16(saveBlock1),
     y: readS16(saveBlock1 + 2),
     mapGroup: u8[saveBlock1 + 4],
