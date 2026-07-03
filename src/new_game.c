@@ -51,9 +51,6 @@ extern const u8 EventScript_ResetAllMapFlags[];
 static void ClearFrontierRecord(void);
 static void WarpToTruck(void);
 static void ResetMiniGamesRecords(void);
-#if WASM
-static void GiveWasmNewGameSpawnBonuses(void);
-#endif
 
 EWRAM_DATA bool8 gDifferentSaveFile = FALSE;
 EWRAM_DATA bool8 gEnableContestDebugging = FALSE;
@@ -187,9 +184,6 @@ void NewGameInitData(void)
     ClearRoamerLocationData();
     gSaveBlock1Ptr->registeredItem = ITEM_NONE;
     ClearBag();
-#if WASM
-    GiveWasmNewGameSpawnBonuses();
-#endif
     NewGameInitPCItems();
     ClearPokeblocks();
     ClearDecorationInventories();
@@ -211,22 +205,6 @@ void NewGameInitData(void)
     ResetTrainerHillResults();
     ResetContestLinkResults();
 }
-
-#if WASM
-#define WASM_SPAWN_MONEY 999999
-#define WASM_SPAWN_MON_LEVEL 100
-
-static void GiveWasmNewGameSpawnBonuses(void)
-{
-    SetMoney(&gSaveBlock1Ptr->money, WASM_SPAWN_MONEY);
-    AddBagItem(ITEM_RARE_CANDY, MAX_BAG_ITEM_CAPACITY);
-    AddBagItem(ITEM_MASTER_BALL, MAX_BAG_ITEM_CAPACITY);
-
-    CreateMon(&gPlayerParty[0], SPECIES_DRAGONITE, WASM_SPAWN_MON_LEVEL, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
-    CreateMon(&gPlayerParty[1], SPECIES_ZAPDOS, WASM_SPAWN_MON_LEVEL, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
-    gPlayerPartyCount = 2;
-}
-#endif
 
 static void ResetMiniGamesRecords(void)
 {

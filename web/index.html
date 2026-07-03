@@ -64,10 +64,64 @@
         <button id="fullscreen" type="button">Big Picture</button>
         <input id="upload-save" type="file" accept=".sav,.srm,application/octet-stream" />
       </div>
+
+      <button id="cheat-open" class="cheat-open" type="button">Cheats</button>
     </section>
 
     <p class="keys">Keyboard: arrows, Z=A, X=B, Enter=Start, Shift=Select.</p>
   </main>
+
+  <dialog id="cheat-dialog" class="cheat-dialog" aria-labelledby="cheat-title">
+    <div class="cheat-shell">
+      <header class="cheat-header">
+        <h2 id="cheat-title">Cheats</h2>
+        <button id="cheat-close" class="cheat-close" type="button" aria-label="Close cheats">Close</button>
+      </header>
+
+      <p id="cheat-message" class="cheat-message" role="status">Loading options…</p>
+
+      <section class="cheat-section" aria-labelledby="cheat-pokemon-title">
+        <h3 id="cheat-pokemon-title">Get Pokémon</h3>
+        <label for="cheat-pokemon">Pokémon</label>
+        <input id="cheat-pokemon" list="cheat-species-options" autocomplete="off" placeholder="Rayquaza" />
+
+        <div class="cheat-grid">
+          <label for="cheat-move-1">Move 1<input id="cheat-move-1" class="cheat-move" list="cheat-move-options" autocomplete="off" placeholder="Dragon Claw" /></label>
+          <label for="cheat-move-2">Move 2<input id="cheat-move-2" class="cheat-move" list="cheat-move-options" autocomplete="off" placeholder="Earthquake" /></label>
+          <label for="cheat-move-3">Move 3<input id="cheat-move-3" class="cheat-move" list="cheat-move-options" autocomplete="off" placeholder="Flamethrower" /></label>
+          <label for="cheat-move-4">Move 4<input id="cheat-move-4" class="cheat-move" list="cheat-move-options" autocomplete="off" placeholder="Thunderbolt" /></label>
+        </div>
+
+        <label for="cheat-party-slot">Party slot</label>
+        <select id="cheat-party-slot">
+          <option value="">Next empty</option>
+          <option value="0">Replace slot 1</option>
+          <option value="1">Replace slot 2</option>
+          <option value="2">Replace slot 3</option>
+          <option value="3">Replace slot 4</option>
+          <option value="4">Replace slot 5</option>
+          <option value="5">Replace slot 6</option>
+        </select>
+
+        <button id="cheat-add-pokemon" class="cheat-action" type="button" disabled>Get level 100 Pokémon</button>
+      </section>
+
+      <section class="cheat-section" aria-labelledby="cheat-item-title">
+        <h3 id="cheat-item-title">Get Item</h3>
+        <label for="cheat-item">Item</label>
+        <input id="cheat-item" list="cheat-item-options" autocomplete="off" placeholder="Master Ball" />
+
+        <label for="cheat-item-count">Quantity</label>
+        <input id="cheat-item-count" type="number" min="1" max="99" value="1" />
+
+        <button id="cheat-add-item" class="cheat-action" type="button" disabled>Get item</button>
+      </section>
+    </div>
+  </dialog>
+
+  <datalist id="cheat-species-options"></datalist>
+  <datalist id="cheat-move-options"></datalist>
+  <datalist id="cheat-item-options"></datalist>
   <script type="module" src="/web/app.js"></script>
 </body>
 </html>

@@ -51,6 +51,12 @@ const SAVE_BAG_POCKETS = [
   [0x690, 64, 99],
   [0x790, 46, 999],
 ];
+const PARTY_SIZE = 6;
+const POKEMON_SIZE = 100;
+const CHEAT_MON_LEVEL = 100;
+const USE_RANDOM_IVS = 32;
+const OT_ID_PLAYER_ID = 0;
+const MAX_BAG_ITEM_CAPACITY = 99;
 const SAVE_STORAGE_KEY = 'pokeemerald.wasm.flash.v1';
 const SAVE_FLUSH_INTERVAL_MS = 1000;
 const searchParams = new URLSearchParams(location.search);
@@ -87,6 +93,20 @@ const fullscreenButton = document.querySelector('#fullscreen');
 const shell = document.querySelector('.shell');
 const downloadSaveButton = document.querySelector('#download-save');
 const uploadSaveInput = document.querySelector('#upload-save');
+const cheatOpen = document.querySelector('#cheat-open');
+const cheatDialog = document.querySelector('#cheat-dialog');
+const cheatClose = document.querySelector('#cheat-close');
+const cheatMessage = document.querySelector('#cheat-message');
+const cheatPokemonInput = document.querySelector('#cheat-pokemon');
+const cheatMoveInputs = [...document.querySelectorAll('.cheat-move')];
+const cheatPartySlot = document.querySelector('#cheat-party-slot');
+const cheatAddPokemon = document.querySelector('#cheat-add-pokemon');
+const cheatItemInput = document.querySelector('#cheat-item');
+const cheatItemCount = document.querySelector('#cheat-item-count');
+const cheatAddItem = document.querySelector('#cheat-add-item');
+const cheatSpeciesOptions = document.querySelector('#cheat-species-options');
+const cheatMoveOptions = document.querySelector('#cheat-move-options');
+const cheatItemOptions = document.querySelector('#cheat-item-options');
 const ctx = canvas.getContext('2d');
 let image;
 const pressed = new Set();
@@ -109,6 +129,9 @@ let lastSavedFlashHash = 0;
 let lastSaveFlushTime = performance.now();
 let wasmModulePromise;
 let bootId = 0;
+let cheatDataReady = false;
+let cheatDataFailed = false;
+let cheatOptions = { species: [], moves: [], items: [] };
 let automationReady;
 let resolveAutomationReady;
 if (automate) {
@@ -543,6 +566,236 @@ async function uploadSave(file) {
   await restartWithSave(normalized);
 }
 
+function setCheatMessage(message, isError = false) {
+  cheatMessage.textContent = message;
+  cheatMessage.classList.toggle('error', isError);
+}
+
+function normalizeCheatValue(value) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/^(SPECIES|MOVE|ITEM)_/, '')
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function formatCheatName(symbol, prefix) {
+  const key = symbol.slice(prefix.length);
+  const specialNames = {
+    FARFETCHD: "Farfetch'd",
+    HO_OH: 'Ho-Oh',
+    MR_MIME: 'Mr. Mime',
+    NIDORAN_F: 'Nidoran F',
+    NIDORAN_M: 'Nidoran M',
+    PORYGON2: 'Porygon2',
+  };
+  if (specialNames[key]) return specialNames[key];
+  if (/^(TM|HM)\d+$/.test(key)) return key;
+
+  return key
+    .split('_')
+    .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function parseCheatConstants(text, prefix, { maxValue, excludedKeys = [] } = {}) {
+  const regex = new RegExp(`^#define\\s+(${prefix}[A-Z0-9_]+)\\s+([0-9]+)\\b`, 'gm');
+  const excluded = new Set(excludedKeys);
+  const options = [];
+  let match;
+
+  while ((match = regex.exec(text))) {
+    const symbol = match[1];
+    const value = Number(match[2]);
+    const key = symbol.slice(prefix.length);
+    if (value <= 0 || excluded.has(key) || (maxValue && value > maxValue)) continue;
+    options.push({
+      key,
+      name: formatCheatName(symbol, prefix),
+      normalizedName: normalizeCheatValue(formatCheatName(symbol, prefix)),
+      symbol,
+      value,
+    });
+  }
+
+  return options.sort((a, b) => a.value - b.value);
+}
+
+function populateCheatDatalist(element, options) {
+  const fragment = document.createDocumentFragment();
+  for (const option of options) {
+    const node = document.createElement('option');
+    node.value = option.name;
+    node.label = `${option.symbol} #${option.value}`;
+    fragment.append(node);
+  }
+  element.replaceChildren(fragment);
+}
+
+async function fetchText(path) {
+  const response = await fetch(path, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`failed to load ${path}`);
+  return response.text();
+}
+
+async function loadCheatOptions() {
+  try {
+    const [speciesText, movesText, itemsText] = await Promise.all([
+      fetchText('/include/constants/species.h'),
+      fetchText('/include/constants/moves.h'),
+      fetchText('/include/constants/items.h'),
+    ]);
+
+    cheatOptions = {
+      species: parseCheatConstants(speciesText, 'SPECIES_', { maxValue: 411, excludedKeys: ['NONE', 'EGG'] }),
+      moves: parseCheatConstants(movesText, 'MOVE_', { maxValue: 354, excludedKeys: ['NONE'] }),
+      items: parseCheatConstants(itemsText, 'ITEM_', { maxValue: 376, excludedKeys: ['NONE'] }),
+    };
+    populateCheatDatalist(cheatSpeciesOptions, cheatOptions.species);
+    populateCheatDatalist(cheatMoveOptions, cheatOptions.moves);
+    populateCheatDatalist(cheatItemOptions, cheatOptions.items);
+    cheatDataReady = true;
+    cheatDataFailed = false;
+  } catch (error) {
+    console.error(error);
+    cheatDataFailed = true;
+    setCheatMessage('Could not load cheat options.', true);
+  }
+  updateCheatControls();
+}
+
+function resolveCheatOption(options, value) {
+  const input = value.trim();
+  if (!input) return null;
+
+  const numericValue = Number(input);
+  if (Number.isInteger(numericValue)) return options.find((option) => option.value === numericValue) || null;
+
+  const normalized = normalizeCheatValue(input);
+  return options.find((option) => (
+    option.normalizedName === normalized
+    || option.key === normalized
+    || option.symbol === input.toUpperCase()
+  )) || null;
+}
+
+function exportedAddress(name) {
+  const exported = instance?.exports?.[name];
+  if (!exported || typeof exported.value !== 'number') throw new Error(`${name} is not exported`);
+  return exported.value;
+}
+
+function exportedFunction(name) {
+  const fn = instance?.exports?.[name];
+  if (typeof fn !== 'function') throw new Error(`${name} is not exported`);
+  return fn;
+}
+
+function currentPartyCount() {
+  const countPtr = exportedAddress('gPlayerPartyCount');
+  const count = clamp(u8[countPtr], 0, PARTY_SIZE);
+  if (u8[countPtr] !== count) u8[countPtr] = count;
+  return count;
+}
+
+function setPartyCount(count) {
+  u8[exportedAddress('gPlayerPartyCount')] = clamp(count, 0, PARTY_SIZE);
+}
+
+function selectedPartySlot() {
+  if (cheatPartySlot.value === '') return null;
+  return Number(cheatPartySlot.value);
+}
+
+function saveGameAfterCheat() {
+  const save = instance?.exports?.TrySavingData;
+  if (typeof save !== 'function') {
+    saveFlashIfChanged(true);
+    return true;
+  }
+
+  const SAVE_NORMAL = 0;
+  const SAVE_STATUS_OK = 1;
+  const status = save(SAVE_NORMAL);
+  saveFlashIfChanged(true);
+  return status === SAVE_STATUS_OK;
+}
+
+function giveCheatPokemon() {
+  try {
+    if (!instance || !cheatDataReady) throw new Error('Cheats are still loading.');
+
+    const species = resolveCheatOption(cheatOptions.species, cheatPokemonInput.value);
+    if (!species) throw new Error('Choose a Pokémon from the list.');
+
+    const moves = cheatMoveInputs.map((input) => {
+      if (!input.value.trim()) return null;
+      const move = resolveCheatOption(cheatOptions.moves, input.value);
+      if (!move) throw new Error(`Unknown move: ${input.value}`);
+      return move;
+    });
+
+    const partyCount = currentPartyCount();
+    const requestedSlot = selectedPartySlot();
+    let slot = requestedSlot;
+    if (slot === null) {
+      if (partyCount >= PARTY_SIZE) throw new Error('Party is full. Choose a slot to replace.');
+      slot = partyCount;
+    } else if (!Number.isInteger(slot) || slot < 0 || slot >= PARTY_SIZE) {
+      throw new Error('Choose a valid party slot.');
+    } else if (slot > partyCount) {
+      throw new Error('Use the next empty slot before skipping party slots.');
+    }
+
+    const monPtr = exportedAddress('gPlayerParty') + slot * POKEMON_SIZE;
+    exportedFunction('CreateMon')(monPtr, species.value, CHEAT_MON_LEVEL, USE_RANDOM_IVS, 0, 0, OT_ID_PLAYER_ID, 0);
+    moves.forEach((move, index) => {
+      if (move) exportedFunction('SetMonMoveSlot')(monPtr, move.value, index);
+    });
+    if (slot === partyCount) setPartyCount(partyCount + 1);
+
+    const saved = saveGameAfterCheat();
+    const moveText = moves.some(Boolean) ? ' with selected moves' : '';
+    setCheatMessage(`${species.name} added at level 100${moveText}${saved ? '.' : ', but saving failed.'}`, !saved);
+  } catch (error) {
+    console.error(error);
+    setCheatMessage(error.message || String(error), true);
+  }
+}
+
+function giveCheatItem() {
+  try {
+    if (!instance || !cheatDataReady) throw new Error('Cheats are still loading.');
+
+    const item = resolveCheatOption(cheatOptions.items, cheatItemInput.value);
+    if (!item) throw new Error('Choose an item from the list.');
+
+    const count = clamp(Number.parseInt(cheatItemCount.value, 10) || 1, 1, MAX_BAG_ITEM_CAPACITY);
+    cheatItemCount.value = String(count);
+    const added = exportedFunction('AddBagItem')(item.value, count);
+    if (!added) throw new Error('The bag has no room for that item.');
+
+    const saved = saveGameAfterCheat();
+    setCheatMessage(`${item.name} x${count} added${saved ? '.' : ', but saving failed.'}`, !saved);
+  } catch (error) {
+    console.error(error);
+    setCheatMessage(error.message || String(error), true);
+  }
+}
+
+function updateCheatControls() {
+  const ready = Boolean(instance && cheatDataReady);
+  cheatAddPokemon.disabled = !ready;
+  cheatAddItem.disabled = !ready;
+  if (cheatDataFailed) setCheatMessage('Could not load cheat options.', true);
+  else if (!cheatDataReady) setCheatMessage('Loading options…');
+  else if (!instance) setCheatMessage('Start the game before using cheats.');
+  else if (cheatMessage.textContent === 'Loading options…' || cheatMessage.textContent === 'Start the game before using cheats.') {
+    setCheatMessage('Ready.');
+  }
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -777,7 +1030,21 @@ function setPressed(name, isPressed) {
   if (u16) writeKeys();
 }
 
+function clearGameKeys() {
+  pressed.clear();
+  pendingPresses.clear();
+  document.querySelectorAll('[data-key]').forEach((el) => el.classList.remove('pressed'));
+  if (u16) writeKeys();
+}
+
+function shouldIgnoreGameKey(event) {
+  const target = event.target;
+  return target instanceof Element
+    && (target.closest('.cheat-dialog') || target.matches('input, select, textarea'));
+}
+
 window.addEventListener('keydown', (event) => {
+  if (shouldIgnoreGameKey(event)) return;
   const name = keyMap.get(event.code);
   if (!name) return;
   event.preventDefault();
@@ -785,6 +1052,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('keyup', (event) => {
+  if (shouldIgnoreGameKey(event)) return;
   const name = keyMap.get(event.code);
   if (!name) return;
   event.preventDefault();
@@ -839,6 +1107,22 @@ uploadSaveInput.addEventListener('change', async () => {
   }
 });
 
+cheatOpen.addEventListener('click', () => {
+  clearGameKeys();
+  updateCheatControls();
+  cheatDialog.showModal();
+  cheatPokemonInput.focus();
+});
+
+cheatClose.addEventListener('click', () => cheatDialog.close());
+cheatDialog.addEventListener('click', (event) => {
+  if (event.target === cheatDialog) cheatDialog.close();
+});
+cheatAddPokemon.addEventListener('click', giveCheatPokemon);
+cheatAddItem.addEventListener('click', giveCheatItem);
+
+loadCheatOptions();
+
 function fpsStatus(displayFps, gameFps) {
   return `${statusText} — Display FPS: ${displayFps}, Game FPS: ${gameFps} (${(gameFps / 60).toFixed(1)}x)`;
 }
@@ -858,6 +1142,7 @@ async function boot(saveBytes) {
   currentFrame = 0;
   gameFrameAccumulator = 0;
   resetFpsCounters();
+  updateCheatControls();
   statusText = `running — ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MiB wasm`;
   setSpeed(initialSpeed());
   statusEl.textContent = fpsStatus(0, 0);
