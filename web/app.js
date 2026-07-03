@@ -56,6 +56,8 @@ const POKEMON_SIZE = 100;
 const CHEAT_MON_LEVEL = 100;
 const USE_RANDOM_IVS = 32;
 const OT_ID_PLAYER_ID = 0;
+const FLAG_SET_SEEN = 2;
+const FLAG_SET_CAUGHT = 3;
 const MAX_BAG_ITEM_CAPACITY = 99;
 const SAVE_STORAGE_KEY = 'pokeemerald.wasm.flash.v1';
 const SAVE_FLUSH_INTERVAL_MS = 1000;
@@ -737,6 +739,12 @@ function saveGameAfterCheat() {
   return status === SAVE_STATUS_OK;
 }
 
+function registerCheatPokemon(species) {
+  const nationalDexNum = exportedFunction('SpeciesToNationalPokedexNum')(species);
+  exportedFunction('GetSetPokedexFlag')(nationalDexNum, FLAG_SET_SEEN);
+  exportedFunction('GetSetPokedexFlag')(nationalDexNum, FLAG_SET_CAUGHT);
+}
+
 function giveCheatPokemon() {
   try {
     if (!instance || !cheatDataReady) throw new Error('Cheats are still loading.');
@@ -769,6 +777,7 @@ function giveCheatPokemon() {
       if (move) exportedFunction('SetMonMoveSlot')(monPtr, move.value, index);
     });
     if (slot === partyCount) setPartyCount(partyCount + 1);
+    registerCheatPokemon(species.value);
 
     const saved = saveGameAfterCheat();
     const moveText = moves.some(Boolean) ? ' with selected moves' : '';
