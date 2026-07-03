@@ -19,8 +19,8 @@ const DMA_ENABLE = 0x8000;
 const SAVE_SECTORS_PER_SLOT = 14;
 const SAVE_SECTOR_SIGNATURE = 0x08012025;
 const SAVE_SECTOR_DATA_SIZES = [
-  0x0f08,
-  0x0f80, 0x0f80, 0x0f80, 0x0dc0,
+  0x0f2c,
+  0x0f80, 0x0f80, 0x0f80, 0x0f0c,
   0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x07d0,
 ];
 const VANILLA_SAVE_SECTOR_DATA_SIZES = [
@@ -38,11 +38,11 @@ const LEGACY_WASM_FRONTEND_SAVE_SECTOR_DATA_SIZES = [
   0x0f80, 0x0f80, 0x0f80, 0x0dc0,
   0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x0f80, 0x07d0,
 ];
-const SAVE_BLOCK2_SIZE = 0x0f08;
-const SAVE_BLOCK1_SIZE = 0x3c40;
+const SAVE_BLOCK2_SIZE = 0x0f2c;
+const SAVE_BLOCK1_SIZE = 0x3d8c;
 const LEGACY_SAVE_BLOCK2_SIZE = 0x0f08;
 const LEGACY_SAVE_BLOCK1_SIZE = 0x3c44;
-const SAVE_BLOCK2_ENCRYPTION_KEY_OFFSET = 0x0a8;
+const SAVE_BLOCK2_ENCRYPTION_KEY_OFFSET = 0x0ac;
 const SAVE_BLOCK1_COINS_OFFSET = 0x494;
 const SAVE_BAG_POCKETS = [
   [0x560, 30, 99],
@@ -299,7 +299,8 @@ function isValidEmeraldSave(bytes, sectorDataSizes) {
 }
 
 function isValidCurrentBuildSave(bytes) {
-  return isValidEmeraldSave(bytes, SAVE_SECTOR_DATA_SIZES);
+  return isValidEmeraldSave(bytes, SAVE_SECTOR_DATA_SIZES)
+    || isValidEmeraldSave(bytes, VANILLA_SAVE_SECTOR_DATA_SIZES);
 }
 
 function copyRange(dst, dstOffset, src, srcOffset, size) {
@@ -527,6 +528,7 @@ function repairStaleBagEncryptionSave(bytes) {
   for (let slot = 0; slot < 2; slot++) {
     let sectorDataSizes = null;
     if (hasValidEmeraldSaveSlot(bytes, slot, SAVE_SECTOR_DATA_SIZES)) sectorDataSizes = SAVE_SECTOR_DATA_SIZES;
+    else if (hasValidEmeraldSaveSlot(bytes, slot, VANILLA_SAVE_SECTOR_DATA_SIZES)) sectorDataSizes = VANILLA_SAVE_SECTOR_DATA_SIZES;
     if (!sectorDataSizes) continue;
 
     const blocks = readSlotSaveBlocks(bytes, slot, sectorDataSizes, SAVE_BLOCK2_SIZE, SAVE_BLOCK1_SIZE);
